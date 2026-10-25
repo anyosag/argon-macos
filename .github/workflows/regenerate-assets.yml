@@ -30,8 +30,21 @@ jobs:
       - name: Clone repository
         uses: actions/checkout@v4
 
-      - name: Use Xcode 26
-        run: sudo xcode-select --switch "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+      - name: Set up Xcode 26
+        # actool reads .icon packages through Icon Composer's document type,
+        # which a fresh runner hasn't registered ("Could not open
+        # AppIcon.icon"): finish Xcode's first launch and register the
+        # Icon Composer app it ships with.
+        run: |
+          xcode=/Applications/Xcode_26.5.app
+          [ -d "$xcode" ] || xcode="$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+          sudo xcode-select --switch "$xcode"
+          xcodebuild -version
+          xcrun actool --version
+          sudo xcodebuild -runFirstLaunch
+          lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+          find "$xcode/Contents/Applications" -maxdepth 1 -name 'Icon Composer.app' -print \
+            -exec "$lsregister" -f {} \;
 
       - name: Install coreutils
         run: brew install coreutils
