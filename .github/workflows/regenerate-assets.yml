@@ -1,0 +1,65 @@
+name: Regenerate macOS icon and DMG assets
+
+# Assets.car (the macOS 26 app icon) and dmg_dsstore (the DMG window layout)
+# can only be built on macOS. This rebuilds them from their sources and
+# commits the results to the branch that changed the sources.
+on:
+  push:
+    branches: ['**']
+    paths:
+      - resources/assets/AppIcon.icon/**
+      - resources/assets/app.icns
+      - resources/dmg.json
+      - resources/dmg_background.png
+      - devutils/generate_dmg_dsstore.sh
+      - .github/workflows/regenerate-assets.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regenerate:
+    runs-on: macos-latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+
+      - name: Use Xcode 26
+        run: sudo xcode-select --switch "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+
+      - name: Install coreutils
+        run: brew install coreutils
+
+      - name: Compile Assets.car from AppIcon.icon
+        run: |
+          mkdir -p build/icon
+          xcrun actool resources/assets/AppIcon.icon \
+            --compile build/icon \
+            --app-icon AppIcon \
+            --platform macosx \
+            --target-device mac \
+            --minimum-deployment-target 12.0 \
+            --output-partial-info-plist build/icon/partial.plist \
+            --errors --warnings --notices
+          xcrun assetutil --info build/icon/Assets.car | grep -q '"AppIcon"'
+          cp build/icon/Assets.car resources/assets/Assets.car
+
+      - name: Regenerate dmg_dsstore
+        run: ./devutils/generate_dmg_dsstore.sh
+
+      - name: Commit regenerated assets
+        run: |
+          git add resources/assets/Assets.car resources/dmg_dsstore
+          if git diff --cached --quiet; then
+            echo "Assets are up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Regenerate Assets.car and dmg_dsstore"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
