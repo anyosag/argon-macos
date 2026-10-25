@@ -37,17 +37,21 @@ jobs:
 
       - name: Compile Assets.car from AppIcon.icon
         run: |
-          mkdir -p build/icon
-          xcrun actool resources/assets/AppIcon.icon \
-            --compile build/icon \
+          # actool hands off to a helper that doesn't share our working
+          # directory, so every path must be absolute
+          out="$PWD/build/icon"
+          mkdir -p "$out"
+          xcrun actool \
+            --compile "$out" \
             --app-icon AppIcon \
             --platform macosx \
             --target-device mac \
             --minimum-deployment-target 12.0 \
-            --output-partial-info-plist build/icon/partial.plist \
-            --errors --warnings --notices
-          xcrun assetutil --info build/icon/Assets.car | grep -q '"AppIcon"'
-          cp build/icon/Assets.car resources/assets/Assets.car
+            --output-partial-info-plist "$out/partial.plist" \
+            --errors --warnings --notices \
+            "$PWD/resources/assets/AppIcon.icon"
+          xcrun assetutil --info "$out/Assets.car" | grep -q '"AppIcon"'
+          cp "$out/Assets.car" resources/assets/Assets.car
 
       - name: Regenerate dmg_dsstore
         run: ./devutils/generate_dmg_dsstore.sh
