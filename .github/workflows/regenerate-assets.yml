@@ -35,6 +35,25 @@ jobs:
       - name: Install coreutils
         run: brew install coreutils
 
+      - name: Check actool against Helium's original icon
+        continue-on-error: true
+        run: |
+          git fetch --depth 1 origin main
+          ref="$PWD/build/reference"
+          mkdir -p "$ref/AppIcon.icon/Assets" "$ref/Empty.xcassets" "$ref/a" "$ref/b"
+          git show FETCH_HEAD:resources/assets/AppIcon.icon/icon.json > "$ref/AppIcon.icon/icon.json"
+          git show FETCH_HEAD:resources/assets/AppIcon.icon/Assets/logo.svg > "$ref/AppIcon.icon/Assets/logo.svg"
+          echo '{"info":{"author":"xcode","version":1}}' > "$ref/Empty.xcassets/Contents.json"
+          common=(--app-icon AppIcon --platform macosx --target-device mac
+                  --minimum-deployment-target 12.0 --errors --warnings)
+          echo "== .icon alone"
+          xcrun actool --compile "$ref/a" --output-partial-info-plist "$ref/a/p.plist" \
+            "${common[@]}" "$ref/AppIcon.icon" || echo "FAILED: .icon alone"
+          echo "== .icon with an asset catalog"
+          xcrun actool --compile "$ref/b" --output-partial-info-plist "$ref/b/p.plist" \
+            "${common[@]}" "$ref/Empty.xcassets" "$ref/AppIcon.icon" || echo "FAILED: with catalog"
+          ls -la "$ref/a" "$ref/b"
+
       - name: Compile Assets.car from AppIcon.icon
         run: |
           # actool hands off to a helper that doesn't share our working
