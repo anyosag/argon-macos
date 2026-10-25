@@ -49,13 +49,33 @@ jobs:
       - name: Install coreutils
         run: brew install coreutils
 
+      - name: Find which AppIcon.icon file actool rejects (temporary)
+        continue-on-error: true
+        shell: bash
+        run: |
+          git fetch --depth 1 origin main
+          d="$PWD/build/bisect"
+          for v in orig-json+orig-svg new-json+orig-svg orig-json+new-svg new-json+new-svg; do
+            icon="$d/$v/AppIcon.icon"
+            mkdir -p "$icon/Assets" "$d/$v/out"
+            case "$v" in orig-json*) git show FETCH_HEAD:resources/assets/AppIcon.icon/icon.json > "$icon/icon.json" ;;
+              *) cp resources/assets/AppIcon.icon/icon.json "$icon/icon.json" ;; esac
+            case "$v" in *orig-svg) git show FETCH_HEAD:resources/assets/AppIcon.icon/Assets/logo.svg > "$icon/Assets/logo.svg" ;;
+              *) cp resources/assets/AppIcon.icon/Assets/logo.svg "$icon/Assets/logo.svg" ;; esac
+            if xcrun actool --output-format=xml1 --errors --platform=macosx --target-device=mac \
+                 --lightweight-asset-runtime-mode=enabled --app-icon=AppIcon \
+                 --minimum-deployment-target=13.0 --output-partial-info-plist="$d/$v/out/p.plist" \
+                 --compile="$d/$v/out" "$icon" > "$d/$v/log" 2>&1 && [ -f "$d/$v/out/Assets.car" ]; then
+              echo "OK   $v"
+            else
+              echo "FAIL $v: $(grep -m1 -v '^<' "$d/$v/log")"
+            fi
+          done
+
       - name: Compile Assets.car from AppIcon.icon
         shell: bash
-        # Flags as in Chromium's tools/mac/icons/compile_car.py. Without
-        # --lightweight-asset-runtime-mode, actool uses the runner's system
-        # asset frameworks, which can't open .icon packages ("Could not
-        # open AppIcon.icon"). The .xcassets holds the fallback bitmaps for
-        # macOS before 26.
+        # Flags as in Chromium's tools/mac/icons/compile_car.py. The
+        # .xcassets holds the fallback bitmaps for macOS before 26.
         run: |
           out="$PWD/build/icon"
           src="$PWD/build/icon-src"
