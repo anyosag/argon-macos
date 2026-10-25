@@ -12,10 +12,15 @@ notarized, so macOS blocks the first launch: open Argon with right-click
 They also have no built-in updater, which needs a Sparkle signing key.
 
 ## Icons
-`resources/assets/AppIcon.icon` (Icon Composer) is the source of the app
-icon. `Assets.car` and `resources/dmg_dsstore` can only be built on macOS;
-the `Regenerate macOS icon and DMG assets` workflow rebuilds and commits
-them whenever their sources change.
+`resources/assets/AppIcon.icon` (Icon Composer) is the source of the macOS 26
+app icon, and `resources/assets/Assets.xcassets` holds the fallback bitmaps
+for older macOS. Both compile into `resources/assets/Assets.car`, which has
+to be built on a Mac with Xcode 26: run `devutils/compile_assets_car.sh` and
+commit the result. (`actool` on GitHub's macOS runners can't read `.icon`
+packages.)
+
+`resources/dmg_dsstore` (the DMG window layout) is rebuilt and committed by
+the `Regenerate DMG layout` workflow whenever its sources change.
 
 ## Credits
 

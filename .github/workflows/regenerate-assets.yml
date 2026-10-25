@@ -1,14 +1,13 @@
-name: Regenerate macOS icon and DMG assets
+name: Regenerate DMG layout
 
-# Assets.car (the macOS 26 app icon) and dmg_dsstore (the DMG window layout)
-# can only be built on macOS. This rebuilds them from their sources and
-# commits the results to the branch that changed the sources.
+# dmg_dsstore (the DMG window layout) can only be built on macOS. This
+# rebuilds it from its sources and commits it to the branch that changed
+# them. Assets.car can't be built here (actool on GitHub's runners fails to
+# read any .icon package): run devutils/compile_assets_car.sh on a Mac.
 on:
   push:
     branches: ['**']
     paths:
-      - resources/assets/AppIcon.icon/**
-      - resources/assets/Assets.xcassets/**
       - resources/assets/app.icns
       - resources/dmg.json
       - resources/dmg_background.png
@@ -30,82 +29,20 @@ jobs:
       - name: Clone repository
         uses: actions/checkout@v4
 
-      - name: Set up Xcode 26
-        # actool reads .icon packages through Icon Composer's document type,
-        # which a fresh runner hasn't registered ("Could not open
-        # AppIcon.icon"): finish Xcode's first launch and register the
-        # Icon Composer app it ships with.
-        run: |
-          xcode=/Applications/Xcode_26.5.app
-          [ -d "$xcode" ] || xcode="$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
-          sudo xcode-select --switch "$xcode"
-          xcodebuild -version
-          xcrun actool --version
-          sudo xcodebuild -runFirstLaunch
-          lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
-          find "$xcode/Contents/Applications" -maxdepth 1 -name 'Icon Composer.app' -print \
-            -exec "$lsregister" -f {} \;
-
       - name: Install coreutils
         run: brew install coreutils
-
-      - name: Find which AppIcon.icon file actool rejects (temporary)
-        continue-on-error: true
-        shell: bash
-        run: |
-          git fetch --depth 1 origin main
-          d="$PWD/build/bisect"
-          for v in orig-json+orig-svg new-json+orig-svg orig-json+new-svg new-json+new-svg; do
-            icon="$d/$v/AppIcon.icon"
-            mkdir -p "$icon/Assets" "$d/$v/out"
-            case "$v" in orig-json*) git show FETCH_HEAD:resources/assets/AppIcon.icon/icon.json > "$icon/icon.json" ;;
-              *) cp resources/assets/AppIcon.icon/icon.json "$icon/icon.json" ;; esac
-            case "$v" in *orig-svg) git show FETCH_HEAD:resources/assets/AppIcon.icon/Assets/logo.svg > "$icon/Assets/logo.svg" ;;
-              *) cp resources/assets/AppIcon.icon/Assets/logo.svg "$icon/Assets/logo.svg" ;; esac
-            if xcrun actool --output-format=xml1 --errors --platform=macosx --target-device=mac \
-                 --lightweight-asset-runtime-mode=enabled --app-icon=AppIcon \
-                 --minimum-deployment-target=13.0 --output-partial-info-plist="$d/$v/out/p.plist" \
-                 --compile="$d/$v/out" "$icon" > "$d/$v/log" 2>&1 && [ -f "$d/$v/out/Assets.car" ]; then
-              echo "OK   $v"
-            else
-              echo "FAIL $v: $(grep -m1 -v '^<' "$d/$v/log")"
-            fi
-          done
-
-      - name: Compile Assets.car from AppIcon.icon
-        shell: bash
-        # Flags as in Chromium's tools/mac/icons/compile_car.py. The
-        # .xcassets holds the fallback bitmaps for macOS before 26.
-        run: |
-          out="$PWD/build/icon"
-          src="$PWD/build/icon-src"
-          mkdir -p "$out" "$src"
-          cp -R resources/assets/Assets.xcassets resources/assets/AppIcon.icon "$src/"
-          xcrun actool \
-            --output-format=xml1 --notices --warnings --errors \
-            --platform=macosx --target-device=mac \
-            --lightweight-asset-runtime-mode=enabled \
-            --enable-icon-stack-fallback-generation=disabled \
-            --include-all-app-icons \
-            --app-icon=AppIcon \
-            --minimum-deployment-target=13.0 \
-            --output-partial-info-plist="$out/partial.plist" \
-            --compile="$out" \
-            "$src/Assets.xcassets" "$src/AppIcon.icon"
-          xcrun assetutil --info "$out/Assets.car" | grep -q '"AppIcon"'
-          cp "$out/Assets.car" resources/assets/Assets.car
 
       - name: Regenerate dmg_dsstore
         run: ./devutils/generate_dmg_dsstore.sh
 
-      - name: Commit regenerated assets
+      - name: Commit dmg_dsstore
         run: |
-          git add resources/assets/Assets.car resources/dmg_dsstore
+          git add resources/dmg_dsstore
           if git diff --cached --quiet; then
-            echo "Assets are up to date"
+            echo "dmg_dsstore is up to date"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Regenerate Assets.car and dmg_dsstore"
+          git commit -m "Regenerate dmg_dsstore"
           git push origin "HEAD:${GITHUB_REF_NAME}"
