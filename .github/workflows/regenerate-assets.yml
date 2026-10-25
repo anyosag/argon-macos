@@ -1,0 +1,48 @@
+name: Regenerate DMG layout
+
+# dmg_dsstore (the DMG window layout) can only be built on macOS. This
+# rebuilds it from its sources and commits it to the branch that changed
+# them. Assets.car can't be built here (actool on GitHub's runners fails to
+# read any .icon package): run devutils/compile_assets_car.sh on a Mac.
+on:
+  push:
+    branches: ['**']
+    paths:
+      - resources/assets/app.icns
+      - resources/dmg.json
+      - resources/dmg_background.png
+      - devutils/generate_dmg_dsstore.sh
+      - .github/workflows/regenerate-assets.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regenerate:
+    runs-on: macos-latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+
+      - name: Install coreutils
+        run: brew install coreutils
+
+      - name: Regenerate dmg_dsstore
+        run: ./devutils/generate_dmg_dsstore.sh
+
+      - name: Commit dmg_dsstore
+        run: |
+          git add resources/dmg_dsstore
+          if git diff --cached --quiet; then
+            echo "dmg_dsstore is up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Regenerate dmg_dsstore"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

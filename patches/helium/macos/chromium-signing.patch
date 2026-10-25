@@ -99,7 +99,7 @@
      @property
      def provisioning_profile_basename(self):
 +        if os.environ.get('PROD_MACOS_SPECIAL_ENTITLEMENTS_PROFILE_PATH'):
-+            return 'Helium'
++            return 'Argon'
          return None
 --- a/chrome/installer/mac/signing/model.py
 +++ b/chrome/installer/mac/signing/model.py
