@@ -14,6 +14,6 @@ jobs:
         with: { submodules: true, fetch-depth: 0 }
 
       - name: Run bump-platform action from helium-chromium
-        uses: imputnet/helium-chromium/.github/actions/bump-platform@main
+        uses: anyosag/Argon/.github/actions/bump-platform@main
         with:
           token: ${{ secrets.GHPAT }}
