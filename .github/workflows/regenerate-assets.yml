@@ -23,7 +23,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # dmg_dsstore differs byte-for-byte on every build, so rebuilding it when
+  # nothing it depends on changed (a merge, a force push) only adds a commit.
+  # Rebuild it only if its sources changed since it was last committed.
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      stale: ${{ steps.check.outputs.stale }}
+    env:
+      SOURCES: >-
+        resources/assets/app.icns resources/dmg.json
+        resources/dmg_background.png devutils/generate_dmg_dsstore.sh
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compare dmg_dsstore with its sources
+        id: check
+        run: |
+          last=$(git log -1 --format=%H -- resources/dmg_dsstore)
+          if [ "$GITHUB_EVENT_NAME" != workflow_dispatch ] && [ -n "$last" ] &&
+             git diff --quiet "$last" HEAD -- $SOURCES; then
+            echo "dmg_dsstore is newer than its sources (last built in $last)"
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+          fi
+
   regenerate:
+    needs: check
+    if: needs.check.outputs.stale == 'true'
     runs-on: macos-latest
     steps:
       - name: Clone repository
