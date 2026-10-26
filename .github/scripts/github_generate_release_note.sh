@@ -32,16 +32,19 @@ submodule_commit_at() {
     git ls-tree "$1" helium-chromium | awk '{print $3}'
 }
 
-last_tag=$(git describe --tags --abbrev=0)
-commit_then=$(submodule_commit_at "$last_tag")
-commit_now=$(submodule_commit_at HEAD)
-
 {
-  printf 'Changes since last build:\n### argon-macos\n```\n'
-  git log --oneline "$last_tag..HEAD"
-  printf '```\n\n### Argon\n```\n'
-  git -C helium-chromium log --oneline "$commit_then..$commit_now"
-  printf '```\n\n---\n\n'
-  printf 'See [this GitHub Actions Run](%s) for the [Workflow file](%s/workflow) used '
-  printf 'as well as the build logs and artifacts\n' "$_gh_run_href" "$_gh_run_href" 
+  # The first release has no earlier tag to compare against.
+  if last_tag=$(git describe --tags --abbrev=0 2>/dev/null); then
+    commit_then=$(submodule_commit_at "$last_tag")
+    commit_now=$(submodule_commit_at HEAD)
+
+    printf 'Changes since last build:\n### argon-macos\n```\n'
+    git log --oneline "$last_tag..HEAD"
+    printf '```\n\n### Argon\n```\n'
+    git -C helium-chromium log --oneline "$commit_then..$commit_now"
+    printf '```\n\n---\n\n'
+  else
+    printf 'First Argon build.\n\n---\n\n'
+  fi
+  printf 'See [this GitHub Actions Run](%s) for the [Workflow file](%s/workflow) used as well as the build logs and artifacts\n' "$_gh_run_href" "$_gh_run_href"
 } | tee -a ./github_release_note.md
