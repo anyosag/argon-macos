@@ -6,10 +6,27 @@ macOS packaging & development tooling for
 ## Building and development
 [> See docs/building.md](docs/building.md)
 
-Argon builds without Helium's signing secrets are ad-hoc signed and not
-notarized, so macOS blocks the first launch: open Argon with right-click
-→ Open, or run `xattr -dr com.apple.quarantine /Applications/Argon.app`.
-They also have no built-in updater, which needs a Sparkle signing key.
+To build a release on GitHub, run the "Build macOS binaries of Argon"
+workflow from the Actions tab. Each finished run has an arm64 and an x86_64
+DMG among its artifacts, and ticking "Create a release" also publishes them
+as a release.
+
+Argon is built without an Apple Developer ID, so it is ad-hoc signed and not
+notarized:
+
+- macOS blocks the first launch. After copying Argon to Applications, run
+  `xattr -dr com.apple.quarantine /Applications/Argon.app`, or try to open
+  it once and then click Open Anyway in System Settings → Privacy &
+  Security. (Since macOS 15, right-click → Open no longer skips this.)
+- Each build has a new signature, so macOS may ask for your password the
+  first time a new version opens its "Argon Storage Key" Keychain item.
+- Passkeys stored in iCloud Keychain need Apple-approved entitlements, which
+  only a Developer ID build can carry.
+- There's no built-in updater, which needs a Sparkle signing key: install
+  each new version by hand.
+
+With a Developer ID, set the `PROD_MACOS_*` secrets listed in
+`.github/workflows/build-phase.yml` to sign and notarize instead.
 
 ## Icons
 `resources/assets/AppIcon.icon` (Icon Composer) is the source of the macOS 26
