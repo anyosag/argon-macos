@@ -73,7 +73,12 @@ write_gn_args() {
   printf 'target_cpu = "%s"\n' "$target_cpu" >> "$args"
 
   if [ "$mode" = ci ]; then
-    echo 'cc_wrapper="sccache"' >> "$args"
+    # Use sccache only with a configured backend (an SCCACHE_* setting such as
+    # SCCACHE_WEBDAV_ENDPOINT). Each CI phase resumes the previous phase's
+    # build tree, so a cache local to one runner would only take up disk.
+    if env | grep -q '^SCCACHE_'; then
+      echo 'cc_wrapper="sccache"' >> "$args"
+    fi
     if [ -n "${PROD_MACOS_SPECIAL_ENTITLEMENTS_PROFILE_B64:-}" ]; then
       echo 'include_branded_entitlements=true' >> "$args"
     fi
