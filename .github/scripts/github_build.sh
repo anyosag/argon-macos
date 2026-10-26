@@ -15,11 +15,9 @@ cd "$_src_dir"
 echo $(date +%s) | tee -a "$_root_dir/build_times_$_target_cpu.log"
 echo "status=running" >> $GITHUB_OUTPUT
 
-if ! env | grep -q SCCACHE; then
-    export SCCACHE_GHA_ENABLED=on
-    export SCCACHE_GHA_VERSION="$_target_cpu"
-fi
-
+# sccache's GitHub Actions cache backend can't be used from here: run steps
+# don't get the runtime token it needs, so it failed to start. Without an
+# SCCACHE_* backend, write_gn_args builds without sccache instead.
 export SCCACHE_WEBDAV_KEY_PREFIX="$_target_cpu"
 
 _error_code=0
